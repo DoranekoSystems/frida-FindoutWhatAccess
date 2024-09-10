@@ -1,6 +1,6 @@
-# Frida - FindOutWhatAccess
+# frida-FindoutWhatAccess
 
-This project implements the functionality of 'Find out what accesses this address' using Frida.
+Implements 'Find out what accesses this address' using Frida
 
 ## Setup
 1. Install the required dependencies:

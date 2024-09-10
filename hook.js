@@ -2,6 +2,20 @@ const MAX_WATCHPOINTS = 4;
 
 let watchpoints = new Array(MAX_WATCHPOINTS).fill(null);
 let thread = null;
+let breakCounter = 0;
+let breakFlag = false;
+let hookedAddressList = [];
+let informationQueue = [];
+
+function bytesToHex(bytes) {
+  var hexArray = [];
+  for (var i = 0; i < bytes.length; ++i) {
+    var hex = (bytes[i] & 0xff).toString(16);
+    hex = hex.length === 1 ? "0" + hex : hex;
+    hexArray.push(hex);
+  }
+  return hexArray.join("");
+}
 
 function initializeWatchpoints() {
   thread = Process.enumerateThreads()[0];
@@ -11,23 +25,48 @@ function initializeWatchpoints() {
 
 function exceptionHandler(e) {
   if (["breakpoint", "single-step"].includes(e.type)) {
-    const bytes = e.context.pc.readByteArray(4);
-    send({ pc: e.context.pc }, bytes);
-    for (let i = 0; i < MAX_WATCHPOINTS; i++) {
-      if (watchpoints[i] !== null) {
-        thread.unsetHardwareWatchpoint(i);
+    if (breakCounter == 0) {
+      const bytes = new Uint8Array(e.context.pc.readByteArray(4));
+
+      // Since send is very slow, push to a queue and retrieve it at regular intervals
+      let data = {
+        context: e.context,
+        hexData: bytesToHex(bytes),
+        symbol: DebugSymbol.fromAddress(e.context.pc).moduleName,
+        watchSlot: 0,
+      };
+      let breakFlag = true;
+      let hookAddress = parseInt(e.context.pc.add(0x04));
+      if (hookedAddressList.length > 0) {
+        Interceptor.detachAll();
+        gc();
+        let x = 1 + 1;
+        hookedAddressList = [];
       }
-    }
-    Interceptor.attach(e.context.pc.add(0x04), {
-      onEnter: function (args) {
-        for (let i = 0; i < MAX_WATCHPOINTS; i++) {
-          if (watchpoints[i] !== null) {
-            const { address, size, conditions } = watchpoints[i];
-            thread.setHardwareWatchpoint(i, address, size, conditions);
+      Interceptor.attach(ptr(hookAddress), {
+        onEnter: function (args) {
+          // Exclude it except during break
+          if (breakFlag) {
+            data.watchSlot = breakCounter - 1;
+            informationQueue.push(data);
+            for (let i = 0; i < breakCounter; i++) {
+              if (watchpoints[i] !== null) {
+                const { address, size, conditions } = watchpoints[i];
+                thread.setHardwareWatchpoint(i, address, size, conditions);
+              }
+            }
+            breakCounter = 0;
+            breakFlag = false;
           }
-        }
-      },
-    });
+        },
+      });
+      hookedAddressList.push(hookAddress);
+    }
+    // Disable each watchpoint one by one to identify which watchpoint was triggered
+    if (watchpoints[breakCounter] !== null) {
+      thread.unsetHardwareWatchpoint(breakCounter);
+    }
+    breakCounter++;
     return true;
   }
   return false;
@@ -76,4 +115,9 @@ rpc.exports = {
   },
   removewatchpoint: removeWatchpoint,
   removeallwatchpoints: removeAllWatchpoints,
+  getbreakinfo: function () {
+    let result = informationQueue;
+    informationQueue = [];
+    return result;
+  },
 };
