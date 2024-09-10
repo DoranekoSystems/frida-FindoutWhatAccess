@@ -1,25 +1,22 @@
 # frida-FindoutWhatAccess
 
-Implements 'Find out what accesses this address' using Frida
+Implements 'Find out what accesses this address' using Frida.  
+Tested on iOS arm64 only.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/56e709b8-971a-4763-8608-478e8a711d64">
 
 ## Setup
 1. Install the required dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+pip install -r requirements.txt
+```
 
 ## How to Use
-1. Modify `main.py` to set watchpoints for the desired memory addresses. For example:
-    ```python
-    api.setwatchpoint(0xb9cd26b10, 4, "w")  # Watch for writes
-    api.setwatchpoint(0xb9cd26b18, 4, "r")  # Watch for reads
-    ```
+1. Run the script with your target application:
+```bash
+python main.py SurvivalShooter # attach
 
-2. Run the script with your target application:
-    ```bash
-    python main.py SurvivalShooter
-    ```
+or
 
-## Todo
-- Implement functionality to identify the watchpoint number triggered by memory access.
-- Add a graphical user interface (GUI) for easier interaction.
+python main.py com.DoranekoSystems.SurvivalShooter # spawn
+```
